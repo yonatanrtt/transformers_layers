@@ -3,6 +3,9 @@ import wandb
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader
+from functools import partial
+from transformers import DataCollatorForLanguageModeling
+
 
 def get_datasets(): 
     dataset = "super_glue"
@@ -14,14 +17,12 @@ def get_datasets():
 
 
 class CopaDataset(torch.utils.data.Dataset):
-    def __init__(self, _data, _tokenizer):
+    def __init__(self, _data):
         self.premise = list(_data["premise"])
         self.choice1 = list(_data["choice1"]) 
         self.choice2 = list(_data["choice2"])  
         self.question = list(_data["question"])   
-        self.label = list(_data["label"])  
-        self.tokenizer = _tokenizer
-        self.tokenizer = _tokenizer
+        self.label = list(_data["label"])
 
     def __getitem__(self, _idx):
         connector = "because" if self.question[_idx] == "cause" else "so"
@@ -33,16 +34,27 @@ class CopaDataset(torch.utils.data.Dataset):
         positive = connector.join((self.premise[_idx], answers[positive_answers_idx]))
         negative = connector.join((self.premise[_idx], answers[negative_answers_idx]))
 
-        positive_tokenized = self.tokenizer.encode(positive, padding="max_length", truncation=True, return_tensors="pt")[0]
-        negative_tokenized = self.tokenizer.encode(negative, padding="max_length", truncation=True, return_tensors="pt")[0]
-
-
-        return positive_tokenized, negative_tokenized
+        return negative, positive
 
     def __len__(self):
         return len(self.label)
 
 
-def get_dataloader(_data, _tokenizer):
-  ds = CopaDataset(_data, _tokenizer)
-  return DataLoader(ds, batch_size=5, shuffle=True)
+def preprocess_batch(_batch, _lm, _device):
+   
+    data_collator = DataCollatorForLanguageModeling(
+          tokenizer=_lm.tokenizer, mlm=True, mlm_probability=0.15)  
+
+    negative, positive = list(zip(*_batch))
+    positive_tokenized = _lm.tokenizer.encode(positive, padding=True, truncation=True, return_tensors="pt")
+    negative_tokenized = _lm.tokenizer.encode(negative, padding=True, truncation=True, return_tensors="pt")
+
+    positive_input, positive_label = data_collator(tuple(positive_tokenized)).values()
+    negative_input,negative_label = data_collator(tuple(negative_tokenized)).values()
+
+    return positive_tokenized.to(_device), negative_tokenized.to(_device), positive_input.to(_device), negative_input.to(_device)
+
+
+def get_dataloader(_data, _lm, _device):
+  ds = CopaDataset(_data)
+  return DataLoader(ds, batch_size=2, shuffle=True, collate_fn=partial(preprocess_batch, _lm=_lm, _device=_device))

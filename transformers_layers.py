@@ -23,16 +23,19 @@ if torch.cuda.is_available():
 
 import data
 import models
-import lm
+import lm_utils
+from lm_utils import LM
 
 copa, cb, rte, wic = data.get_datasets()
 
-tokenizer, config, model, model_mlm = lm.init()
- model.to(device)
- train_dataloader = data.get_dataloader(copa["train"], tokenizer)
+lm: LM = lm_utils.init()
+lm.model.to(device)
+train_dataloader = data.get_dataloader(copa["train"], lm, device)
 
-superglue_model = models.CopaModel(model, config, device)
-for step, batch in enumerate(train_dataloader):
-  positive, negative = torch.stack(batch).to(device)
-  print("-"*100)
-  superglue_model(positive, negative)
+from tqdm.auto import tqdm
+tqdm.pandas()
+
+superglue_model = models.CopaModel(lm, device)
+for step, batch in tqdm(enumerate(train_dataloader)):
+  positive_tokenized, negative_tokenized, positive_input, negative_input = batch
+  superglue_model(positive_tokenized, negative_tokenized, positive_input, negative_input)
