@@ -21,10 +21,6 @@ class CbModel(nn.Module):
         
         output = self.dropout(cls_inputs)
         output = self.linear(output)
-        output = self.act(output)
         loss = self.loss_fn(output, _labels.long())
 
-        return output, loss, loss
-        
-
-        
+        return output, loss, _labels

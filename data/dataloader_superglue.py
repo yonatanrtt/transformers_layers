@@ -45,5 +45,5 @@ class DataSuperglue():
 
   def get_dataloader(self, _data):
       # ipdb.set_trace()
-      ds = self.dataset_class(_data, self.lm)
+      ds = self.dataset_class(_data[:20], self.lm)
       return DataLoader(ds, batch_size=self.BATCH_SIZE, shuffle=True, collate_fn=partial(ds.preprocess_batch, _data_collator=self.data_collator))
