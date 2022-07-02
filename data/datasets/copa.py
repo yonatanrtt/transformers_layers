@@ -36,3 +36,23 @@ class CopaDataset(torch.utils.data.Dataset):
 
     def __len__(self):
         return len(self.label)
+
+    def preprocess_batch(self, _batch, _data_collator):      
+
+      negative, positive, label = list(zip(*_batch))
+
+      positive_tokenized = self.lm.tokenizer(list(positive), padding=True, truncation=True, return_tensors="pt")
+      negative_tokenized = self.lm.tokenizer(list(negative), padding=True, truncation=True, return_tensors="pt")
+
+      batch = (positive_tokenized, negative_tokenized)
+
+      if self.lm.is_mlm:
+        positive_input, positive_label = _data_collator(tuple(positive_tokenized)).values()
+        negative_input,negative_label = _data_collator(tuple(negative_tokenized)).values()
+        batch += (positive_input, negative_input)
+      
+      labels = torch.Tensor(label)
+      batch += labels,
+
+      return batch
+

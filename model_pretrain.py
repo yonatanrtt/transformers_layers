@@ -2,34 +2,38 @@ import torch
 import torch.nn as nn
 
 
-class CopaModel(nn.Module):
+class ModelMiddleTrained(nn.Module):
 
-    def __init__(self, _lm, _device):
-        super(CopaModel, self).__init__()
+    def __init__(self, _lm):
+        super(ModelMiddleTrained, self).__init__()
+        self.lm = _lm
         self.model = _lm.model
-        self.layers_linear = nn.Linear(_lm.config.hidden_size, _lm.config.num_hidden_layers).to(_device)
+        self.layers_linear = nn.Linear(_lm.config.hidden_size, _lm.config.num_hidden_layers)
+        self.act = nn.Sigmoid()
+        self.dropout =  nn.Dropout(p=self.lm.config.hidden_dropout_prob)
+        self.loss_fn = nn.CrossEntropyLoss()
 
-    def forward(self, _positive_tokenized, _negative_tokenized, positive_input, negative_input):
+    def forward(self, _input_tokenized, _input_masked):
 
         # todo - orthogonal matrices + gan
-        positive = self.model(_positive_tokenized)
-        negative = self.model(_negative_tokenized)
+        output_lm = self.model(_input_tokenized)
 
         layers_classifaiers = []
-        for layer in positive.hidden_states:
+        for layer in output_lm.hidden_states:
           cls = layer[:, 0, :]
-          output = self.layers_linear(cls)
+          output = self.dropout(cls)
+          output = self.layers_linear(output)          
           layers_classifaiers.append(output)
+        layers_loss_sum = sum(layers_classifaiers)
 
-        for layer in negative.hidden_states:
-          cls = layer[:, 0, :]
-          output = self.layers_linear(cls)
-          layers_classifaiers.append(output)
-
-        positive_mask = model(input_ids, attention_mask=input_mask, labels=token_labels)
-        negative_mask = model(input_ids, attention_mask=input_mask, labels=token_labels)
+        output_mlm = self.model(_input_masked, labels=_input_tokenized)
+        output_mlm.loss
 
 
         return output
+
+    def save_lm(self):
+      self.lm.tokenizer.save_pretrained("")
+      self.model.save_pretrained()
 
         
