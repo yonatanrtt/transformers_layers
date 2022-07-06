@@ -20,16 +20,15 @@ class CopaModel(nn.Module):
 
     def forward(self, _batch):
         # ipdb.set_trace()
-        
-        _positive_tokenized, _negative_tokenized, _labels = _batch
+        _input_1, _input_2, _labels = _batch
 
-        cls_positive = self.lm_cls(_positive_tokenized)
-        cls_negative = self.lm_cls(_negative_tokenized)
+        cls_input_1 = self.lm_cls(_input_1)
+        cls_input_2 = self.lm_cls(_input_2)
 
-        cls_positive = cls_positive.view(cls_positive.shape[0], 1, cls_positive.shape[-1])
-        cls_negative = cls_negative.view(cls_negative.shape[0], 1, cls_negative.shape[-1])
+        cls_input_1 = cls_input_1.view(cls_input_1.shape[0], 1, cls_input_1.shape[-1])
+        cls_input_2 = cls_input_2.view(cls_input_2.shape[0], 1, cls_input_2.shape[-1])
 
-        embd = torch.cat((cls_positive, cls_negative), axis=1)
+        embd = torch.cat((cls_input_1, cls_input_2), axis=1)
         
         output = self.dropout(embd)
         output = self.linear(output)

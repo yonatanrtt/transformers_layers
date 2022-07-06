@@ -34,7 +34,7 @@ class RteDataset(torch.utils.data.Dataset):
       batch = inputs_tokenized,
 
       if self.lm.is_mlm:
-        inputs_input, inputs_label = _data_collator(tuple(inputs_tokenized)).values()
+        inputs_input, inputs_label =  _data_collator(tuple(inputs_tokenized.input_ids)).values()
         batch += inputs_tokenized,
       
       labels = torch.Tensor(label)
