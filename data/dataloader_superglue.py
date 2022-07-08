@@ -6,6 +6,7 @@ import torch
 import ipdb
 
 import shared.utils as utils
+import shared.constants as constants
 import data.utils_datasets as utils_datasets
 
 class DataSuperglue():
@@ -20,25 +21,6 @@ class DataSuperglue():
     self.data = utils_datasets.get_data(_data_name)
     self.BATCH_SIZE = 8
 
-  def preprocess_batch(self, _batch):      
-
-      negative, positive, label = list(zip(*_batch))
-
-      positive_tokenized = self.lm.tokenizer(list(positive), padding=True, truncation=True, return_tensors="pt")
-      negative_tokenized = self.lm.tokenizer(list(negative), padding=True, truncation=True, return_tensors="pt")
-
-      batch = (positive_tokenized, negative_tokenized)
-
-      if self.lm.is_mlm:
-        positive_input, positive_label = self.data_collator(tuple(positive_tokenized)).values()
-        negative_input,negative_label = self.data_collator(tuple(negative_tokenized)).values()
-        batch += (positive_input, negative_input)
-      
-      labels = torch.Tensor(label)
-      batch += labels,
-
-      return batch
-
   def get_db_dataloaders(self):
       return (self.get_dataloader(self.data["train"].data),
       self.get_dataloader(self.data["validation"].data),
@@ -46,5 +28,7 @@ class DataSuperglue():
 
 
   def get_dataloader(self, _data):
+      if constants.DATA_LIMIT is not None:
+        _data = _data[:constants.DATA_LIMIT]
       ds = self.dataset_class(_data, self.lm)
       return DataLoader(ds, batch_size=self.BATCH_SIZE, shuffle=True, collate_fn=partial(ds.preprocess_batch, _data_collator=self.data_collator))

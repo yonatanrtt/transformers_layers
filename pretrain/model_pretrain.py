@@ -3,12 +3,13 @@ import torch.nn as nn
 import ipdb
 import random
 
-from models.gan.generator import Generator
-from models.gan.discriminator import Discriminator
+from pretrain.gan.generator import Generator
+from pretrain.gan.discriminator import Discriminator
+import shared.constants as constants
 
 class PreTrainModel(nn.Module):
 
-    def __init__(self, _lm):
+    def __init__(self, _lm, _task):
         super(PreTrainModel, self).__init__()
         self.lm = _lm
         self.model = _lm.model_mlm
@@ -18,12 +19,17 @@ class PreTrainModel(nn.Module):
         self.loss_fn = nn.CrossEntropyLoss()
         self.generator = Generator(self.lm)
         self.discriminator = Discriminator(self.lm)
+        self.task = _task
+        self.EPS = 1e-08
 
     def forward(self, _batch):
-        _input_tokenized, _input_masked, _labels = _batch
+        if len(_batch) == 3:
+          _input_tokenized, _input_masked, _labels = _batch
+        else:
+          _input_tokenized, _input_2_tokenized, _input_masked, _labels = _batch
         output_lm = self.model(_input_tokenized.input_ids, attention_mask=_input_tokenized.attention_mask)
 
-        layers_classifaiers = []
+        layers_classifaiers, layers_distance = [], []
         rand_idx = random.randrange(0, len(output_lm.hidden_states))
 
         
@@ -31,25 +37,36 @@ class PreTrainModel(nn.Module):
           cls = layer[:, 0, :]
           if layer_idx == rand_idx:
             b_idx = random.randrange(0, cls.size(0))
-            dis_loss = self.discriminator.forward(cls[b_idx], layer_idx, False)
+            real_output, real_logit, real_prob = self.discriminator.forward(cls[b_idx], layer_idx + 1)
           output = self.dropout(cls)
           output = self.layers_linear(output)
           layer_labels = torch.Tensor([layer_idx]*layer.size(0)).long()
           layer_loss =  self.loss_fn(output, layer_labels)    
           layers_classifaiers.append(layer_loss)
+          if layer_idx > 0:
+            prev_layer_cls = output_lm.hidden_states[layer_idx - 1][:, 0, :]
+            dist_matrix = cls @ prev_layer_cls.T
+            cls_dist = torch.diagonal(dist_matrix)
+            dist_mean = torch.mean(cls_dist)
+            layers_distance.append(dist_mean)
         layers_loss_sum = sum(layers_classifaiers)
+        layers_distance_sum = sum(layers_distance)
       
-        gen = self.generator.forward()
-        gen_dis_loss = self.discriminator.forward(gen, _label=None, _is_generated=True)
+        g_input = self.generator.forward()
+        fake_output, fake_logit, fake_prob = self.discriminator.forward(g_input, constants.FAKE_LABEL)
 
-        output_mlm = self.model(_input_masked.input_ids, attention_mask=_input_masked.attention_mask, labels=_input_tokenized.input_ids)
+        real_loss = -1 * torch.log(1 - real_prob[:, constants.FAKE_LABEL] + self.EPS)
+        real_loss = real_loss[0]
+        fake_loss = -1 * torch.log(fake_prob[:, constants.FAKE_LABEL] + self.EPS)
+        fake_loss = fake_loss[0]
+        output_mlm = self.model(_input_masked, labels=_input_tokenized.input_ids)
         
-        loss = output_mlm.loss + layers_loss_sum + dis_loss + gen_dis_loss
-        print(f"loss: {loss:.2f}, output_mlm.loss: {output_mlm.loss:.2f}, layers_loss_sum: {layers_loss_sum:.2f}, layers_classifaiers: {layers_classifaiers[0]:.2f}, dis_loss: {dis_loss:.2f}, gen_dis_loss: {gen_dis_loss:.2f}")
+        loss = output_mlm.loss + layers_loss_sum + layers_distance_sum + fake_loss + real_loss
+        print(constants.PRINT_COLOR, f"loss: {loss.item():.2f}, output_mlm.loss: {output_mlm.loss:.2f}, layers_loss_sum: {layers_loss_sum:.2f}, layers_distance_sum: {layers_distance_sum:.2f}, layers_classifaiers: {layers_classifaiers[0]:.2f}, real_loss: {real_loss:.2f}, fake_loss: {fake_loss:.2f}")
         return loss
 
     def save_lm(self):
-      self.lm.tokenizer.save_pretrained("/content/LM")
-      self.model.save_pretrained("/content/LM")
+      save_lm_path = constants.SAVE_LM_PATH + self.task
+      self.lm.tokenizer.save_pretrained(save_lm_path)
+      self.model.save_pretrained(save_lm_path)
 
-        

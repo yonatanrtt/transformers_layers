@@ -3,7 +3,9 @@ import ipdb
 
 class LM():
 
-  def __init__(self, _lm_name="roberta-base", _is_pretrain=False) -> None:
+  def __init__(self, _lm_name=None, _is_pretrain=False) -> None:
+      if _lm_name is None:
+        _lm_name = "roberta-base"      
       self.tokenizer = AutoTokenizer.from_pretrained(_lm_name)
       self.config = AutoConfig.from_pretrained(_lm_name)
 

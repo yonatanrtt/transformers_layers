@@ -6,6 +6,7 @@ from shared.lm_class import LM
 import shared.utils as utils
 from data.dataloader_superglue import DataSuperglue
 import shared.constants as constants
+import ipdb
 
 class PretrainTrainer():
 
@@ -14,7 +15,7 @@ class PretrainTrainer():
     self.lm: LM = LM(_is_pretrain=True)
     self.db_name = _db_name
     self.train_dataloader, self.val_dataloader, self.test_dataloader = DataSuperglue(self.lm, _db_name, _db_class).get_db_dataloaders()
-    self.model = PreTrainModel(self.lm)
+    self.model = PreTrainModel(self.lm, _task)
     self.optimizer = AdamW(self.model.parameters(), lr=5e-5)
     self.N_EPOCH = constants.N_EPOCH
     self.writer = SummaryWriter()

@@ -9,9 +9,10 @@ from data.dataloader_superglue import DataSuperglue
 
 class SuperGlueTrainer():
 
-  def __init__(self, _task):
+  def __init__(self, _task, _lm_path=None):
     _db_name, _db_class, _model = utils.init_task(_task)
-    self.lm: LM = LM(_is_pretrain=False)
+    self.lm_path = _lm_path
+    self.lm: LM = LM(_lm_name=_lm_path, _is_pretrain=False)
     self.db_name = _db_name
     self.train_dataloader, self.val_dataloader, self.test_dataloader = DataSuperglue(self.lm, _db_name, _db_class).get_db_dataloaders()
     self.model = _model(self.lm)
@@ -23,6 +24,8 @@ class SuperGlueTrainer():
   def train(self):
     # ipdb.set_trace()
     self.model.train()
+    print("*" * 130 + "\n")
+    print(f"lm path: {self.lm_path}")
     self.evaluation(0, 0)
     for epoch in range(self.N_EPOCH):
       for step, batch in enumerate(self.train_dataloader):
@@ -32,6 +35,7 @@ class SuperGlueTrainer():
           loss.backward()
           self.optimizer.step()
       self.evaluation(epoch, step + 1)
+    print("*" * 130 + "\n")
   
   def evaluation(self, _epoch=0, _step=0):
     self.model.eval()
@@ -42,7 +46,7 @@ class SuperGlueTrainer():
           batch_success = torch.Tensor(output).argmax(1).eq(torch.Tensor(labels)).sum().item() 
           batch_accuracy = batch_success / len(batch[0].input_ids)
           accuracy += batch_accuracy
-    print(f"{self.db_name} - eval result: {accuracy / len(self.val_dataloader):.2f}%")
+    print(constants.PRINT_COLOR, f"{self.db_name} - eval result: {accuracy / len(self.val_dataloader):.2f}%")
     self.writer.add_scalar(f"{self.db_name}/accuracy/val", accuracy, _epoch, _step)
 
   def test(self):

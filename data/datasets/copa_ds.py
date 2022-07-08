@@ -48,8 +48,8 @@ class CopaDataset(torch.utils.data.Dataset):
 
       if self.lm.is_mlm:
         positive_tokenized = self.lm.tokenizer(list(positive), padding=True, truncation=True, return_tensors="pt")
-        positive_input, positive_label =  _data_collator(tuple(positive_tokenized.input_ids)).values()
-        batch += positive_input,
+        masked_input =  _data_collator(tuple(positive_tokenized.input_ids)).values()
+        batch += masked_input,
       
       labels = torch.Tensor(label)
       batch += labels,
