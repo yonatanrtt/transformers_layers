@@ -21,6 +21,11 @@ class PreTrainModel(nn.Module):
         self.discriminator = Discriminator(self.lm)
         self.task = _task
         self.EPS = 1e-08
+        self.W_MLM = 1
+        self.W_LAYERS = 1
+        self.W_DISTANCE = 1
+        self.W_FAKE = 1
+        self.W_REAL= 1
 
     def forward(self, _batch):
         if len(_batch) == 3:
@@ -61,9 +66,9 @@ class PreTrainModel(nn.Module):
         fake_loss = fake_loss[0]
         output_mlm = self.model(_input_masked, labels=_input_tokenized.input_ids)
         
-        loss = output_mlm.loss + layers_loss_sum + layers_distance_sum + fake_loss + real_loss
-        print(constants.PRINT_COLOR, f"loss: {loss.item():.2f}, output_mlm.loss: {output_mlm.loss:.2f}, layers_loss_sum: {layers_loss_sum:.2f}, layers_distance_sum: {layers_distance_sum:.2f}, layers_classifaiers: {layers_classifaiers[0]:.2f}, real_loss: {real_loss:.2f}, fake_loss: {fake_loss:.2f}")
-        return loss
+        loss = ( self.W_MLM * output_mlm.loss ) + ( self.W_LAYERS * layers_loss_sum ) + ( self.W_DISTANCE * layers_distance_sum ) + ( self.W_FAKE * fake_loss ) + ( self.W_REAL * real_loss )
+        losses = (output_mlm.loss, layers_loss_sum, layers_distance_sum, fake_loss, real_loss)
+        return loss, losses
 
     def save_lm(self):
       save_lm_path = constants.SAVE_LM_PATH + self.task
