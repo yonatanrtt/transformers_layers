@@ -61,9 +61,8 @@ class PreTrainModel(nn.Module):
         fake_output, fake_logit, fake_prob = self.discriminator.forward(g_input, constants.FAKE_LABEL)
 
         real_loss = -1 * torch.log(1 - real_prob[:, constants.FAKE_LABEL] + self.EPS)
-        real_loss = real_loss[0]
         fake_loss = -1 * torch.log(fake_prob[:, constants.FAKE_LABEL] + self.EPS)
-        fake_loss = fake_loss[0]
+
         output_mlm = self.model(_input_masked, labels=_input_tokenized.input_ids)
         
         loss = ( self.W_MLM * output_mlm.loss ) + ( self.W_LAYERS * layers_loss_sum ) + ( self.W_DISTANCE * layers_distance_sum ) + ( self.W_FAKE * fake_loss ) + ( self.W_REAL * real_loss )
